@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# Ambientes virtuais
+venv/
+env/
+.venv/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# Distribuição e empacotamento
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs e temporários
+*.log
+*.tmp
+*.bak
+*.orig
+
+# Dados locais (não versionar dados sensíveis ou muito grandes)
+dados/raw/*.bak
+
+# Saídas de ferramentas de benchmarking
+/tmp/fio-test
