@@ -2,7 +2,7 @@
 
 **Autor:** Rodrigo Paiva  
 **Disciplina:** Infraestrutura de Hardware  
-**Data de Entrega:** Junho de 2025
+**Data de Entrega:** Junho de 2026
 
 ---
 
