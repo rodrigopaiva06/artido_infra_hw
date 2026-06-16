@@ -1,0 +1,82 @@
+{
+  "fio_aleatorio_iops": {
+    "n": 30,
+    "media": 191733.33,
+    "dp": 26333.32,
+    "ic95_inferior": 181901.41,
+    "ic95_superior": 201565.25,
+    "unidade": "IOPS"
+  },
+  "fio_aleatorio_latencia": {
+    "n": 30,
+    "media": 337.51,
+    "dp": 58.44,
+    "ic95_inferior": 315.69,
+    "ic95_superior": 359.33,
+    "unidade": "us"
+  },
+  "mbw_16mib": {
+    "n": 30,
+    "media": 3536.23,
+    "dp": 311.05,
+    "ic95_inferior": 3420.1,
+    "ic95_superior": 3652.37,
+    "unidade": "MiB/s"
+  },
+  "mbw_128mib": {
+    "n": 30,
+    "media": 4171.61,
+    "dp": 540.68,
+    "ic95_inferior": 3969.74,
+    "ic95_superior": 4373.49,
+    "unidade": "MiB/s"
+  },
+  "mbw_1024mib": {
+    "n": 30,
+    "media": 4142.94,
+    "dp": 983.91,
+    "ic95_inferior": 3775.59,
+    "ic95_superior": 4510.3,
+    "unidade": "MiB/s"
+  },
+  "sysbench_1t": {
+    "n": 30,
+    "media": 2029.3,
+    "dp": 86.18,
+    "ic95_inferior": 1997.13,
+    "ic95_superior": 2061.48,
+    "unidade": "eventos/s"
+  },
+  "sysbench_2t": {
+    "n": 30,
+    "media": 3507.81,
+    "dp": 163.18,
+    "ic95_inferior": 3446.89,
+    "ic95_superior": 3568.74,
+    "unidade": "eventos/s"
+  },
+  "sysbench_4t": {
+    "n": 30,
+    "media": 6929.24,
+    "dp": 565.22,
+    "ic95_inferior": 6718.21,
+    "ic95_superior": 7140.28,
+    "unidade": "eventos/s"
+  },
+  "sysbench_6t": {
+    "n": 30,
+    "media": 10358.77,
+    "dp": 529.78,
+    "ic95_inferior": 10160.97,
+    "ic95_superior": 10556.57,
+    "unidade": "eventos/s"
+  },
+  "sysbench_12t": {
+    "n": 30,
+    "media": 16079.19,
+    "dp": 696.45,
+    "ic95_inferior": 15819.17,
+    "ic95_superior": 16339.22,
+    "unidade": "eventos/s"
+  }
+}

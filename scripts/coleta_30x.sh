@@ -2,7 +2,8 @@
 # Script de coleta de dados - 30 repeticoes por experimento
 # Infraestrutura de Hardware - Rodrigo Paiva
 
-OUTDIR="$HOME/dados_experimentos"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUTDIR="$REPO_ROOT/dados/raw"
 mkdir -p "$OUTDIR"
 
 REPETICOES=30
@@ -13,7 +14,6 @@ echo "COLETA DE DADOS - 30 repeticoes"
 echo "Iniciado em: $(date)"
 echo "============================================"
 
-# Controle de estado
 echo "Configurando estado do sistema..."
 sudo swapoff -a 2>/dev/null || true
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
@@ -112,5 +112,4 @@ echo "Arquivos salvos em: $OUTDIR"
 ls -lh "$OUTDIR"
 echo "============================================"
 
-# Restaurar swap
 sudo swapon -a 2>/dev/null || true

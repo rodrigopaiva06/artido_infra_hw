@@ -10,7 +10,10 @@ import os
 import json
 from pathlib import Path
 
-OUTDIR = Path.home() / "dados_experimentos"
+REPO_ROOT = Path(__file__).parent.parent
+RAW_DIR = REPO_ROOT / "dados" / "raw"
+PROC_DIR = REPO_ROOT / "dados" / "processado"
+PROC_DIR.mkdir(parents=True, exist_ok=True)
 
 def media(valores):
     return sum(valores) / len(valores)
@@ -53,12 +56,11 @@ def analisar():
     resultados = {}
 
     # fio sequencial
-    arq = OUTDIR / "fio_sequencial.csv"
+    arq = RAW_DIR / "fio_sequencial.csv"
     if arq.exists():
         vals = carregar_csv_coluna(arq, "throughput_mbs")
         if vals:
             ic = ic95(vals)
-            # valor esperado bare-metal para NVMe PCIe 4.0 x4: ~3500 MiB/s (conservador)
             t = teste_t_uma_amostra(vals, 3500)
             resultados["fio_sequencial"] = {
                 "n": len(vals),
@@ -72,7 +74,7 @@ def analisar():
             }
 
     # fio aleatorio IOPS
-    arq = OUTDIR / "fio_aleatorio.csv"
+    arq = RAW_DIR / "fio_aleatorio.csv"
     if arq.exists():
         vals_iops = carregar_csv_coluna(arq, "iops")
         vals_lat = carregar_csv_coluna(arq, "latencia_us")
@@ -98,7 +100,7 @@ def analisar():
             }
 
     # mbw por tamanho
-    arq = OUTDIR / "mbw.csv"
+    arq = RAW_DIR / "mbw.csv"
     if arq.exists():
         for tamanho in [16, 128, 1024]:
             vals = []
@@ -122,7 +124,7 @@ def analisar():
                 }
 
     # sysbench por numero de threads
-    arq = OUTDIR / "sysbench_cpu.csv"
+    arq = RAW_DIR / "sysbench_cpu.csv"
     if arq.exists():
         for threads in [1, 2, 4, 6, 12]:
             vals = []
@@ -145,8 +147,7 @@ def analisar():
                     "unidade": "eventos/s"
                 }
 
-    # salvar resultado
-    saida = OUTDIR / "estatisticas.json"
+    saida = PROC_DIR / "estatisticas.json"
     with open(saida, "w") as f:
         json.dump(resultados, f, indent=2, ensure_ascii=False)
 
