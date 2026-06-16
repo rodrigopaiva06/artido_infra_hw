@@ -304,7 +304,7 @@ A combinação dos três fatores — fração serial (Amdahl), overhead de sincr
 
 Os resultados têm implicações diretas para o uso do WSL2 como plataforma de benchmarking em disciplinas de infraestrutura de hardware:
 
-**Para benchmarks de armazenamento:** O WSL2 não é adequado. O overhead de ~52–68 % na taxa de IOPS e o CV de 13,7 % tornam os resultados não representativos do hardware. Alternativas: Linux nativo (dual-boot ou live USB), Docker em Linux, ou máquina virtual com passthrough NVMe (se suportado pelo hypervisor).
+**Para benchmarks de armazenamento:** O WSL2 não é adequado. O CV de 13,7 % e a amplitude de 89 % entre o pior e o melhor caso tornam os resultados não representativos do hardware. Alternativas: Linux nativo (dual-boot ou live USB), Docker em Linux, ou máquina virtual com passthrough NVMe (se suportado pelo hypervisor).
 
 **Para benchmarks de memória:** O WSL2 não é adequado para medir largura de banda DRAM com mbw. Os valores são anomalamente baixos e o comportamento é não-intuitivo. O uso de ferramentas como STREAM em Linux nativo é recomendado para caracterização precisa.
 
@@ -342,18 +342,18 @@ Todos os dados brutos, scripts e figuras deste trabalho estão disponíveis publ
 
 ## Referências
 
-AXBOE, J. **Flexible I/O Tester (fio) — Manual do Usuário**, versão 3.36. 2020. Disponível em: <https://github.com/axboe/fio/blob/master/HOWTO.rst>. Acesso em: jun. 2025.
+AXBOE, J. **Flexible I/O Tester (fio) — Manual do Usuário**, versão 3.36. 2020. Disponível em: <https://github.com/axboe/fio/blob/master/HOWTO.rst>. Acesso em: jun. 2026.
 
-INTEL CORPORATION. **Intel® Core™ i5-1235U Processor — Product Specifications**. Intel ARK, 2022. Disponível em: <https://ark.intel.com/content/www/us/en/ark/products/226256>. Acesso em: jun. 2025.
+INTEL CORPORATION. **Intel® Core™ i5-1235U Processor — Product Specifications**. Intel ARK, 2022. Disponível em: <https://ark.intel.com/content/www/us/en/ark/products/226256>. Acesso em: jun. 2026.
 
 JAIN, R. **The Art of Computer Systems Performance Analysis: Techniques for Experimental Design, Measurement, Simulation, and Modeling**. New York: John Wiley & Sons, 1991. 685 p. ISBN 0-471-50336-3.
 
 KIVITY, A. et al. KVM: The Linux Virtual Machine Monitor. In: **LINUX SYMPOSIUM**, Ottawa, 2007. Anais... Ottawa: USENIX, 2007. p. 225–230.
 
-MICROSOFT. **Announcing WSL 2**. Windows Command Line Blog, maio 2019. Disponível em: <https://devblogs.microsoft.com/commandline/announcing-wsl-2/>. Acesso em: jun. 2025.
+MICROSOFT. **Announcing WSL 2**. Windows Command Line Blog, maio 2019. Disponível em: <https://devblogs.microsoft.com/commandline/announcing-wsl-2/>. Acesso em: jun. 2026.
 
 RUSSELL, R. virtio: towards a de-facto standard for virtual I/O devices. **ACM SIGOPS Operating Systems Review**, New York, v. 42, n. 5, p. 95–103, jul. 2008. DOI: 10.1145/1400097.1400108.
 
-SK HYNIX. **HFS512GEJ4K112N NVMe SSD — Product Information**. SK Hynix Inc., 2022. Disponível em: <https://www.skhynix.com/products/SSD/PCIe/>. Acesso em: jun. 2025.
+SK HYNIX. **HFS512GEJ4K112N NVMe SSD — Product Information**. SK Hynix Inc., 2022. Disponível em: <https://www.skhynix.com/products/SSD/PCIe/>. Acesso em: jun. 2026.
 
 TRAEGER, A. et al. A nine year study of file system and storage benchmarking. **ACM Transactions on Storage**, New York, v. 4, n. 2, art. 5, p. 1–56, maio 2008. DOI: 10.1145/1367829.1367831.
