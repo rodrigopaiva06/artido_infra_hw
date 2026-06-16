@@ -26,11 +26,14 @@
 
 | Componente | Especificação |
 |------------|---------------|
-| CPU | Intel Core i5 (6 núcleos / 12 threads) |
-| Memória RAM | 16 GB DDR4 |
-| Armazenamento | SSD NVMe (PCIe) |
-| Sistema Operacional Host | Windows 11 |
-| Ambiente de Execução | WSL2 (Ubuntu 22.04) |
+| CPU | Intel Core i5-1235U (Alder Lake, 12ª geração) |
+| Núcleos / Threads | 6 núcleos físicos / 12 threads lógicos (HyperThreading) |
+| Frequência | base 2,5 GHz / turbo 4,4 GHz |
+| Cache | L1d 288 KiB · L1i 192 KiB · L2 7,5 MiB · L3 12 MiB |
+| Memória RAM | 8 GB DDR4 1600 MHz (3,7 GiB visíveis no WSL2) |
+| Armazenamento | SKHynix HFS512GEJ4K112N NVMe PCIe 4.0 ×4, 512 GB |
+| Sistema Operacional Host | Windows 11 Home, Build 26200 |
+| Ambiente de Execução | WSL2 (Ubuntu 24.04 LTS) |
 | Kernel WSL2 | 5.15.x |
 
 ---

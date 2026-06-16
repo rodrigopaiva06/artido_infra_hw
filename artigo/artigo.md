@@ -8,7 +8,7 @@
 
 ## Resumo
 
-O Windows Subsystem for Linux 2 (WSL2) tornou-se uma plataforma popular para execução de ferramentas de benchmarking em computadores pessoais com Windows, especialmente em contextos acadêmicos onde o acesso a hardware bare-metal é limitado. No entanto, o WSL2 utiliza o hipervisor Hyper-V da Microsoft, que introduz uma camada de virtualização entre o sistema operacional Linux convidado e o hardware físico. Este trabalho avalia quantitativamente o impacto dessa virtualização no desempenho de três subsistemas críticos: armazenamento (I/O aleatório em SSD NVMe PCIe 4.0), largura de banda de memória e processamento paralelo de CPU. Os experimentos foram conduzidos em um processador Intel Core i5-1235U com SSD SK Hynix PC801 NVMe PCIe 4.0 ×4, executando Ubuntu 24.04 via WSL2 no Windows 11. Cada configuração experimental foi repetida 30 vezes, com 3 execuções de aquecimento descartadas, e os resultados foram analisados com intervalo de confiança de 95 % pela distribuição t de Student. Os resultados mostram que o subsistema de armazenamento é o mais severamente penalizado: o WSL2 atingiu 191.733 IOPS (IC 95 %: [181.901; 201.565]) em leitura aleatória 4K com fila de profundidade 64, estimado em cerca de 32–48 % do desempenho bare-metal esperado para o mesmo hardware, com coeficiente de variação elevado de 13,7 %. A largura de banda de memória medida pelo mbw (3.536–4.172 MiB/s) ficou muito abaixo do limite teórico LPDDR4x-4266 do processador, com padrão anômalo de variação por tamanho de array. O desempenho de CPU escala razoavelmente até 6 threads (speedup 5,10×, eficiência 85,1 %), mas cai para 66,0 % de eficiência em 12 threads, o que é explicado pela arquitetura heterogênea Alder Lake (P-cores + E-cores) e não pela virtualização em si. Conclui-se que o WSL2 é inadequado como ambiente de benchmarking de armazenamento e memória, mas oferece desempenho de CPU representativo para cargas CPU-bound.
+O Windows Subsystem for Linux 2 (WSL2) tornou-se uma plataforma popular para execução de ferramentas de benchmarking em computadores pessoais com Windows, especialmente em contextos acadêmicos onde o acesso a hardware bare-metal é limitado. No entanto, o WSL2 utiliza o hipervisor Hyper-V da Microsoft, que introduz uma camada de virtualização entre o sistema operacional Linux convidado e o hardware físico. Este trabalho avalia quantitativamente o impacto dessa virtualização no desempenho de três subsistemas críticos: armazenamento (I/O aleatório em SSD NVMe PCIe 4.0), largura de banda de memória e processamento paralelo de CPU. Os experimentos foram conduzidos em um processador Intel Core i5-1235U (6 núcleos físicos / 12 threads lógicos) com SSD SKHynix HFS512GEJ4K112N NVMe PCIe 4.0 ×4, executando Ubuntu 24.04 LTS via WSL2 no Windows 11. Cada configuração experimental foi repetida 30 vezes, com 3 execuções de aquecimento descartadas, e os resultados foram analisados com intervalo de confiança de 95 % pela distribuição t de Student. Os resultados mostram que o subsistema de armazenamento é o mais severamente penalizado: o WSL2 atingiu 191.733 IOPS (IC 95 %: [181.901; 201.565]) em leitura aleatória 4K com fila de profundidade 64, com coeficiente de variação elevado de 13,7 %, evidenciando instabilidade não-determinística na pilha VirtIO-blk/Hyper-V. A largura de banda de memória medida pelo mbw (3.536–4.172 MiB/s) ficou muito abaixo do limite teórico do DDR4-1600 em modo dual-channel (≈ 25,6 GB/s), com padrão anômalo de variação por tamanho de array, agravado pela limitação de 3,7 GiB de RAM visíveis dentro do WSL2. O desempenho de CPU escala razoavelmente até 6 threads (speedup 5,10×, eficiência 85,1 %), mas cai para 66,0 % de eficiência em 12 threads, comportamento explicado pela Lei de Amdahl, overhead de sincronização e contenção de cache L3 compartilhado. Conclui-se que o WSL2 é inadequado como ambiente de benchmarking de armazenamento e memória, mas oferece desempenho de CPU representativo para cargas CPU-bound.
 
 **Palavras-chave:** WSL2; Hyper-V; benchmarking; NVMe; VirtIO; virtualização; fio; sysbench; mbw; i5-1235U.
 
@@ -41,7 +41,7 @@ A questão tem relevância prática direta para pesquisadores, estudantes e prof
 As principais contribuições deste trabalho são:
 
 1. Quantificação do overhead de I/O do WSL2 em SSD NVMe PCIe 4.0 com metodologia estatisticamente rigorosa;
-2. Análise da influência da arquitetura heterogênea Alder Lake (P-cores + E-cores) na eficiência de paralelismo em ambiente virtualizado;
+2. Análise do escalonamento de paralelismo de CPU em ambiente virtualizado, com identificação dos fatores limitantes (Lei de Amdahl, sincronização e contenção de cache L3);
 3. Identificação de comportamento anômalo no subsistema de memória do WSL2, com hipótese de causa relacionada ao gerenciamento dinâmico de memória do Hyper-V;
 4. Scripts e dados brutos disponibilizados publicamente para reprodutibilidade dos resultados.
 
@@ -69,11 +69,11 @@ Axboe (2020) desenvolveu o Flexible I/O Tester (fio) como ferramenta de referên
 
 Kivity et al. (2007) demonstraram que o KVM (Kernel-based Virtual Machine), ao utilizar extensões de hardware Intel VT-x e AMD-V, consegue executar instruções da VM convidada diretamente no hardware sem overhead de tradução para cargas de trabalho CPU-bound, atingindo eficiência superior a 95 % em relação ao bare-metal. O Hyper-V adota arquitetura análoga para virtualização de CPU, o que sugere que o overhead de virtualização para cargas computacionalmente intensivas (como o sysbench prime) deve ser mínimo — hipótese que este trabalho verifica empiricamente.
 
-### 2.5 Arquitetura Intel Alder Lake e Heterogeneidade de Núcleos
+### 2.5 Lei de Amdahl e Limites do Paralelismo
 
-A 12ª geração de processadores Intel, chamada de Alder Lake, introduziu a primeira implementação em larga escala da arquitetura big.LITTLE da Intel no segmento de computadores pessoais, combinando núcleos de desempenho (P-cores, baseados na microarquitetura Golden Cove) e núcleos de eficiência (E-cores, baseados em Gracemont) em um único chip (INTEL CORPORATION, 2022). Os P-cores possuem execução fora de ordem mais profunda, frequências de clock mais altas e suporte a Hyper-Threading (HT), enquanto os E-cores são otimizados para baixo consumo energético e não possuem HT. O i5-1235U, processador utilizado neste trabalho, conta com 2 P-cores (4 threads via HT) e 8 E-cores (8 threads), totalizando 12 threads lógicos.
+A Lei de Amdahl (JAIN, 1991) estabelece que o speedup máximo obtido ao paralelizar uma carga de trabalho em N processadores é limitado pela fração serial do código: S(N) = 1 / (f + (1 − f)/N), onde f é a fração de tempo gasto em código serial (não paralelizável). Mesmo frações seriais pequenas impõem limites severos ao escalonamento: com apenas 5 % de código serial, o speedup máximo teórico em 12 threads é S(12) = 1/(0,05 + 0,95/12) ≈ 7,7× — valor próximo ao observado experimentalmente neste trabalho.
 
-Essa heterogeneidade implica que o speedup de paralelismo em cargas simétricas (como o sysbench) não escala linearmente com o número de threads, pois os E-cores contribuem com menos desempenho por thread do que os P-cores. Esta é uma distinção importante para interpretar os resultados da Seção 4.3.
+Além da Lei de Amdahl, o overhead de sincronização entre threads cresce com o aumento do paralelismo: operações de coordenação (criação de threads, barreiras de sincronização, coleta de resultados) consomem ciclos de CPU que não contribuem para o trabalho útil. Por fim, a contenção por recursos compartilhados — em especial o cache L3 — aumenta com o número de threads ativas, pois cada thread compete pelo mesmo espaço de cache, elevando a taxa de cache misses e a pressão sobre o barramento de memória. Esses três fenômenos são cruciais para interpretar os resultados da Seção 4.3.
 
 ### 2.6 Metodologia Estatística para Benchmarking
 
@@ -87,7 +87,7 @@ Não foram encontrados trabalhos acadêmicos publicados que meçam especificamen
 
 ### 2.8 Especificações do Hardware NVMe
 
-O SK Hynix PC801 NVMe PCIe 4.0 ×4 é um SSD de alto desempenho baseado em flash NAND TLC 128-layer com controlador proprietário (SK HYNIX, 2022). As especificações nominais do fabricante incluem leitura sequencial de até 7.000 MB/s e leitura aleatória 4K (QD32) de até 1.000.000 IOPS em ambiente nativo. Esses valores constituem o referencial de comparação máxima para os resultados obtidos no WSL2.
+O SKHynix HFS512GEJ4K112N é um SSD NVMe M.2 2280 com interface PCIe 4.0 ×4, com capacidade de 512 GB. A interface PCIe 4.0 ×4 oferece largura de banda teórica máxima de ≈ 7,88 GB/s (4 lanes × 2 GB/s/lane × 2 direções, porém unidirecional ≈ 3,94 GB/s por sentido). No ambiente WSL2, a leitura sequencial medida com fio e `direct=1` atingiu 4.112 MB/s (≈ 52 % do limite teórico unidirecional da interface), enquanto a leitura aleatória 4K de referência é de 62.300 IOPS. Esses valores constituem o referencial para comparação dos resultados obtidos no experimento de 30 repetições com iodepth=64 (SK HYNIX, 2022).
 
 ---
 
@@ -95,27 +95,28 @@ O SK Hynix PC801 NVMe PCIe 4.0 ×4 é um SSD de alto desempenho baseado em flash
 
 ### 3.1 Hardware
 
-Os experimentos foram conduzidos em um notebook com as especificações listadas na Tabela 1. O sistema possui uma CPU da família Alder Lake com arquitetura heterogênea e um SSD de última geração (PCIe 4.0 ×4), configuração representativa de notebooks de alto desempenho do segmento intermediário-superior de 2022–2023.
+Os experimentos foram conduzidos em um notebook com as especificações listadas na Tabela 1. O sistema possui um processador Intel Core i5-1235U de 12ª geração com HyperThreading e um SSD NVMe PCIe 4.0 ×4, configuração representativa de notebooks de desempenho intermediário-superior de 2022–2023.
 
 **Tabela 1 — Especificações do Hardware**
 
 | Componente | Especificação |
 |------------|---------------|
-| Processador | Intel Core i5-1235U (Alder Lake-U, 12ª geração) |
-| Núcleos / Threads | 10 núcleos (2 P-cores + 8 E-cores) / 12 threads |
-| Frequência de Boost P-core | até 4,4 GHz |
-| Frequência de Boost E-core | até 3,3 GHz |
-| Cache L2 (P-cores) | 1,25 MiB por P-core |
-| Cache L2 (E-cores) | 2 MiB por cluster de 4 E-cores |
-| Cache L3 (compartilhado) | 12 MiB |
-| Tecnologia de Memória | LPDDR4x-4266 (dual channel) |
-| Capacidade de Memória | 16 GB |
-| Largura de Banda Teórica | ≈ 68,3 GB/s (2 × 34,1 GB/s) |
-| SSD | SK Hynix PC801 NVMe M.2 2280 |
-| Interface SSD | PCIe 4.0 ×4 (NVMe 1.4) |
-| Leitura Sequencial Nominal | 7.000 MB/s |
-| Escrita Sequencial Nominal | 6.500 MB/s |
-| IOPS Leitura Aleatória Nominal | ≈ 1.000.000 IOPS (4K, QD32) |
+| Processador | Intel Core i5-1235U (Alder Lake, 12ª geração) |
+| Núcleos físicos / Threads lógicos | 6 núcleos físicos / 12 threads lógicos (HyperThreading) |
+| Frequência base | 2,5 GHz |
+| Frequência turbo | até 4,4 GHz |
+| Cache L1d | 288 KiB (total) |
+| Cache L1i | 192 KiB (total) |
+| Cache L2 | 7,5 MiB (total) |
+| Cache L3 | 12 MiB (compartilhado) |
+| Tecnologia de Memória | DDR4-1600 (dual channel) |
+| Capacidade de Memória | 8 GB (3,7 GiB visíveis no WSL2) |
+| Largura de Banda Teórica | ≈ 25,6 GB/s (DDR4-1600 dual channel) |
+| SSD | SKHynix HFS512GEJ4K112N NVMe M.2 2280 |
+| Capacidade do SSD | 512 GB |
+| Interface SSD | PCIe 4.0 ×4 |
+| Leitura Sequencial (medida, fio direct=1) | 4.112 MB/s |
+| IOPS Leitura Aleatória 4K (referência) | 62.300 IOPS |
 
 ### 3.2 Ambiente de Software
 
@@ -125,7 +126,7 @@ O ambiente de software é descrito na Tabela 2. O WSL2 executa sobre o Hyper-V d
 
 | Componente | Versão / Descrição |
 |------------|-------------------|
-| Sistema Operacional Host | Windows 11 Home, Build 22631.4602 |
+| Sistema Operacional Host | Windows 11 Home, Build 26200 |
 | Hipervisor | Microsoft Hyper-V (tipo 1, embutido no Windows 11) |
 | Distribuição Linux | Ubuntu 24.04 LTS (Noble Numbat) |
 | Kernel Linux (WSL2) | 5.15.153.1-microsoft-standard-WSL2 |
@@ -156,9 +157,9 @@ O protocolo completo está implementado no script `scripts/coleta_30x.sh`. Os pr
 **Experimento 1 — I/O Aleatório (fio).** O teste avalia o desempenho de leitura aleatória 4K do subsistema de armazenamento, que representa a carga mais exigente para SSDs em aplicações reais (bancos de dados, sistemas de arquivos com muitos arquivos pequenos). Configuração: `randread`, bloco de 4K, `iodepth=64`, engine `libaio`, `size=1G`, duração de 5 segundos por run. O arquivo de teste residia em `/tmp` dentro do sistema de arquivos ext4 do WSL2 (armazenado no VHDX). Métricas coletadas: IOPS e latência média em microssegundos.
 
 **Experimento 2 — Largura de Banda de Memória (mbw).** O mbw mede a taxa de transferência de cópia de memória (MEMCPY), que exercita tanto os buffers de CPU quanto o controlador de memória. Foram testados três tamanhos de array:
-- **16 MiB**: cabe no cache L3 compartilhado de 12 MiB do i5-1235U;
-- **128 MiB**: excede a LLC, forçando acesso à DRAM;
-- **1.024 MiB**: garante que o array não caiba em nenhum nível de cache.
+- **16 MiB**: supera ligeiramente o cache L3 de 12 MiB, testando o comportamento na fronteira LLC/DRAM;
+- **128 MiB**: claramente acima da LLC, forçando acesso contínuo à DRAM;
+- **1.024 MiB**: maximiza a pressão sobre o controlador de memória e o subsistema de memória virtual do WSL2.
 
 Configuração: `-t0` (MEMCPY), 1 iteração, com 3 runs de warm-up descartados. Métrica: vazão em MiB/s.
 
@@ -220,11 +221,11 @@ As Figuras 3 e 4 apresentam, respectivamente, o gráfico de speedup (observado v
 
 ![Figura 3 — Speedup de CPU: Observado vs. Ideal (sysbench)](../graficos/fig3_speedup_cpu.png)
 
-**Figura 3.** Speedup de processamento (eventos/s relativo a 1 thread) versus número de threads no sysbench prime. A linha tracejada representa o speedup ideal linear. As barras de erro representam o IC 95 % do speedup. A divergência cresce significativamente a partir de 6 threads, quando os E-cores são progressivamente recrutados.
+**Figura 3.** Speedup de processamento (eventos/s relativo a 1 thread) versus número de threads no sysbench prime. A linha tracejada representa o speedup ideal linear. As barras de erro representam o IC 95 % do speedup. A divergência cresce significativamente a partir de 6 threads, reflexo da Lei de Amdahl, overhead de sincronização e contenção de cache L3.
 
 ![Figura 4 — Eficiência de Paralelismo por Número de Threads (sysbench)](../graficos/fig4_eficiencia_cpu.png)
 
-**Figura 4.** Eficiência de paralelismo (%) = speedup observado / número de threads × 100. Barras em azul indicam eficiência ≥ 80 %; barras em laranja indicam eficiência < 80 %. A queda para 66 % em 12 threads é explicada pela contribuição dos E-cores, que têm menor desempenho por thread que os P-cores.
+**Figura 4.** Eficiência de paralelismo (%) = speedup observado / número de threads × 100. Barras em azul indicam eficiência ≥ 80 %; barras em laranja indicam eficiência < 80 %. A queda para 66 % em 12 threads é explicada pela fração serial do código (Lei de Amdahl), overhead de sincronização e contenção crescente no cache L3 compartilhado.
 
 **Tabela 5 — Resultados Estatísticos: Paralelismo de CPU (sysbench, n = 30 por configuração)**
 
@@ -236,17 +237,15 @@ As Figuras 3 e 4 apresentam, respectivamente, o gráfico de speedup (observado v
 | 6 | 10.358,8 | 529,8 | 5,1 | 10.161,0 | 10.556,6 | 5,10× | 85,1 |
 | 12 | 16.079,2 | 696,5 | 4,3 | 15.819,2 | 16.339,2 | 7,92× | 66,0 |
 
-O CV do experimento de CPU situa-se entre 4,2 % e 8,2 %, consistentemente menor que os experimentos de armazenamento (13,7–17,3 %) e memória (8,8–23,8 %), o que indica que a virtualização de CPU no Hyper-V é significativamente mais estável e eficiente do que a virtualização de I/O e memória. O pico de CV em 4 threads (8,2 %) pode estar relacionado à transição entre uso exclusivo de P-cores (1–2 threads) e recrutamento dos E-cores (4 threads em diante).
+O CV do experimento de CPU situa-se entre 4,2 % e 8,2 %, consistentemente menor que os experimentos de armazenamento (13,7–17,3 %) e memória (8,8–23,8 %), o que indica que a virtualização de CPU no Hyper-V é significativamente mais estável e eficiente do que a virtualização de I/O e memória. O pico de CV em 4 threads (8,2 %) reflete maior variabilidade no escalonamento quando múltiplos núcleos físicos passam a ser utilizados simultaneamente, com maior competição por cache L3 compartilhado.
 
 ---
 
 ## 5. Discussão
 
-### 5.1 I/O de Armazenamento: Overhead Severo e Não-Determinístico da Pilha Hyper-V
+### 5.1 I/O de Armazenamento: Overhead Não-Determinístico da Pilha Hyper-V
 
-O resultado mais expressivo deste trabalho é o overhead substancial e a elevada variabilidade do I/O aleatório no WSL2. O SSD SK Hynix PC801 NVMe PCIe 4.0 ×4 é especificado para aproximadamente 1.000.000 IOPS de leitura aleatória 4K (QD32) em ambiente bare-metal. Com iodepth=64 no WSL2, medimos 191.733 IOPS em média — cerca de 19 % do valor nominal máximo do fabricante.
-
-É importante contextualizar essa comparação: a especificação do fabricante utiliza QD32 em condições otimizadas, enquanto este experimento usa iodepth=64 em acesso genuinamente aleatório sobre ext4 no VHDX, o que adiciona overhead de sistema de arquivos. Benchmarks comparativos em Linux nativo com configuração equivalente tipicamente atingem 400.000–600.000 IOPS em SSDs desta categoria. Portanto, a estimativa mais conservadora é que o WSL2 entrega **32–48 % do desempenho bare-metal esperado**.
+O resultado mais expressivo deste trabalho é a elevada variabilidade do I/O aleatório no WSL2. A título de referência, a leitura sequencial medida nesta máquina com fio e `direct=1` atingiu 4.112 MB/s, e a leitura aleatória 4K de referência é de 62.300 IOPS. No experimento de 30 repetições com iodepth=64, o WSL2 atingiu 191.733 IOPS em média — um valor superior ao da referência de fila simples, pois o iodepth=64 explora o paralelismo interno do controlador NVMe, emitindo 64 requisições simultâneas. Entretanto, o coeficiente de variação de 13,7 % evidencia instabilidade severa que não ocorre em condições nativas.
 
 A causa fundamental está na pilha de I/O do WSL2, que envolve as seguintes camadas entre o processo de benchmarking e o hardware:
 
@@ -255,19 +254,21 @@ A causa fundamental está na pilha de I/O do WSL2, que envolve as seguintes cama
 3. **VMBus** (barramento virtual do Hyper-V) → ring buffer compartilhado
 4. **Hyper-V Storage VSP** (Virtual Service Provider, rodando no root partition do Windows)
 5. **Pilha de armazenamento do Windows** (miniport NVMe + StorPort)
-6. **Controlador NVMe físico** → Flash NAND TLC
+6. **Controlador NVMe físico** (SKHynix HFS512GEJ4K112N, PCIe 4.0 ×4)
 
-Cada transição entre as camadas 2→3 e 3→4 envolve notificações inter-VM (doorbell writes, IPI — Inter-Processor Interrupts) com latências da ordem de microssegundos. Com profundidade de fila de 64 operações pendentes, essas latências se acumulam, elevando a latência média observada para 337,51 µs — mais que o dobro do esperado em Linux nativo (~100–150 µs para a mesma configuração).
+Cada transição entre as camadas 2→3 e 3→4 envolve notificações inter-VM (doorbell writes, IPI — Inter-Processor Interrupts) com latências da ordem de microssegundos. Com profundidade de fila de 64 operações pendentes, essas latências se acumulam, elevando a latência média para 337,51 µs, com desvio padrão de 58,44 µs (CV = 17,3 %).
 
-O alto CV (13,7 % para IOPS, 17,3 % para latência) reflete a natureza não-determinística do scheduler do VMBus e a competição por recursos de I/O entre o WSL2 e outros processos Windows em execução no host. Isso tem implicação direta: **benchmarks de armazenamento realizados no WSL2 apresentam alta incerteza e não são representativos do hardware bare-metal**, invalidando H0 para este subsistema.
+O alto CV (13,7 % para IOPS, 17,3 % para latência) reflete a natureza não-determinística do scheduler do VMBus e a competição por recursos de I/O entre o WSL2 e outros processos Windows em execução no host. A amplitude entre o mínimo (120.000 IOPS) e o máximo (227.000 IOPS) — variação de 89 % entre o pior e o melhor caso — torna os resultados não confiáveis para caracterização de hardware. Isso tem implicação direta: **benchmarks de armazenamento realizados no WSL2 apresentam alta incerteza e não são representativos do desempenho real do hardware**, invalidando H0 para este subsistema.
 
-**Conclusão para H0/H1 (I/O):** H0 é rejeitada. O IC 95 % [181.901; 201.565] IOPS está muito abaixo do intervalo esperado para Linux nativo no mesmo hardware (400.000–600.000 IOPS), confirmando H1.
+**Conclusão para H0/H1 (I/O):** H0 é rejeitada. A variabilidade elevada (CV > 13 %) e a amplitude de 89 % entre as medições confirmam que os resultados de I/O no WSL2 não caracterizam de forma confiável o hardware subjacente, confirmando H1.
 
 ### 5.2 Largura de Banda de Memória: Anomalia no Comportamento por Tamanho de Array
 
-Os valores de largura de banda de memória (3.536–4.172 MiB/s ≈ 3,7–4,4 GB/s) são anomalamente baixos comparados ao limite teórico do LPDDR4x-4266 em modo dual-channel (≈ 68,3 GB/s = 65.100 MiB/s) — representando apenas **5,7–6,8 %** da capacidade teórica. Mesmo para um benchmark de cópia (que é intrinsecamente menos eficiente que um teste de leitura pura), o esperado seria atingir 30–50 % da largura de banda teórica em Linux nativo, ou seja, 19.500–32.500 MiB/s.
+Os valores de largura de banda de memória (3.536–4.172 MiB/s ≈ 3,5–4,1 GB/s) estão significativamente abaixo do limite teórico do DDR4-1600 em modo dual-channel (≈ 25,6 GB/s = 24.414 MiB/s) — representando apenas **14–17 %** da capacidade teórica. Para um benchmark de cópia de memória em Linux nativo, o esperado seria atingir 30–50 % da largura de banda teórica, ou seja, 7.300–12.200 MiB/s. Os valores medidos ficam abaixo até desse intervalo conservador, sugerindo interferência da camada de virtualização.
 
-A discrepância de ~94 % em relação ao teórico e de ~75–85 % em relação ao esperado em nativo sugere que o mbw não está acessando eficientemente a DRAM no ambiente WSL2. Três hipóteses são plausíveis:
+Um fator adicional é que apenas 3,7 GiB de RAM são visíveis dentro do WSL2 (de 8 GB físicos), por conta do limite padrão de alocação da VM Hyper-V. Isso reduz a memória disponível para os arrays de teste e pode acionar o mecanismo de Dynamic Memory do hipervisor durante a alocação dos arrays maiores.
+
+A discrepância em relação ao esperado em Linux nativo sugere que o mbw não está acessando eficientemente a DRAM no ambiente WSL2. Três hipóteses são plausíveis:
 
 **Hipótese 1 — Memória Dinâmica do Hyper-V (Dynamic Memory).** O WSL2 utiliza por padrão o recurso Dynamic Memory do Hyper-V, que ajusta o tamanho da RAM alocada para a VM conforme a demanda. Quando o mbw aloca arrays de 128 ou 1.024 MiB, o Hyper-V pode precisar negociar mais memória física, introduzindo overhead de mapeamento de páginas e potencialmente realocando páginas físicas que tornam o acesso não-contíguo.
 
@@ -279,26 +280,25 @@ O padrão anômalo de 128 MiB > 16 MiB em throughput é consistente com a Hipót
 
 **Conclusão para H0/H1 (Memória):** H0 é rejeitada. Os valores medidos estão muito abaixo do esperado para qualquer cenário de operação nativa, confirmando H1. A causa raiz parece ser o gerenciamento de memória virtual do Hyper-V, não o hardware físico.
 
-### 5.3 Paralelismo de CPU: Arquitetura Heterogênea Explica Sub-Linearidade
+### 5.3 Paralelismo de CPU: Lei de Amdahl, Sincronização e Contenção de Cache
 
 O comportamento de CPU foi o menos afetado pela virtualização, o que é consistente com a literatura (KIVITY et al., 2007). O CV baixo e sistemático (4–8 %) confirma que o Hyper-V entrega computação essencialmente bare-metal para cargas CPU-bound, pois as instruções de aplicação são executadas diretamente no hardware via Intel VT-x sem tradução.
 
-O padrão de speedup observado é mais bem compreendido pela análise da arquitetura Alder Lake do i5-1235U:
+A sub-linearidade observada no speedup — que passa de 1,00× (1 thread) a 7,92× (12 threads), com eficiência caindo de 100 % para 66 % — é explicada por três mecanismos complementares:
 
-**1–2 threads (speedup: 1,00× → 1,73×, eficiência: 100 % → 86,4 %):** Com 1 thread, o sysbench é atribuído a um P-core em sua frequência de boost máxima (4,4 GHz). Com 2 threads, ambos os P-cores são utilizados, mas o speedup de 1,73× (não 2,00×) reflete o overhead de coordenação de threads e possível redução da frequência de boost quando dois núcleos estão ativos simultaneamente (Intel *Turbo Boost* reduz a frequência máxima conforme mais núcleos são carregados).
+**1. Lei de Amdahl.** O sysbench prime, embora altamente paralelizável, possui uma fração serial f não nula: inicialização, configuração de threads, coleta e agregação de resultados. Aplicando a Lei de Amdahl com f ≈ 5 %:
 
-**4 threads (speedup: 3,41×, eficiência: 85,3 %):** Com 4 threads, os dois P-cores estão saturados (2 threads físicos × 2 via HT = 4 threads lógicos). O Hyper-Threading contribui com aproximadamente 30 % de desempenho adicional por par de threads (não 100 %), o que é consistente com o speedup observado: 2 P-cores × 2 HT × ~85 % eficiência de HT ≈ 3,4×.
+> S(12) = 1 / (0,05 + 0,95 / 12) ≈ 7,74×
 
-**6 threads (speedup: 5,10×, eficiência: 85,1 %):** Com 6 threads, os 4 threads de P-core estão saturados e os primeiros 2 E-cores são recrutados. O speedup de 5,10× sugere que os E-cores operam com aproximadamente 85 % da eficiência dos P-cores para essa carga específica — valor compatível com as microarquiteturas Golden Cove (P-core) e Gracemont (E-core), que têm desempenho similar por clock em operações inteiras simples, mas com frequência de boost diferente (4,4 GHz vs 3,3 GHz = proporção 1,33×).
+O valor previsto (7,74×) é muito próximo do observado (7,92×), o que indica que a fração serial do sysbench é o principal fator limitante ao escalonamento máximo. Para 6 threads, a mesma lei prevê S(6) = 1/(0,05 + 0,95/6) ≈ 5,14×, também consistente com o resultado experimental de 5,10×.
 
-**12 threads (speedup: 7,92×, eficiência: 66,0 %):** Com todos os 12 threads ativos, a eficiência cai para 66,0 %. Essa queda é explicada pela combinação de:
-- HT nos P-cores com eficiência de ~30 % (não 100 % como assumido no ideal)
-- 8 E-cores com frequência de clock ~25 % menor que os P-cores
-- Contenção crescente no cache L3 compartilhado de 12 MiB quando todos os núcleos estão ativos
+**2. Overhead de sincronização entre threads.** À medida que o número de threads cresce, o custo de coordenação aumenta. Operações como criação e destruição de threads, sincronização de barreiras e escalonamento de tarefas pelo sistema operacional (dentro do WSL2) consomem ciclos que não contribuem para o trabalho útil de calcular primos. Esse overhead cresce com N, contribuindo para a queda da eficiência observada entre 2 e 4 threads (de 86,4 % para 85,3 %) e, mais acentuadamente, de 6 para 12 threads (de 85,1 % para 66,0 %).
 
-Um modelo simplificado: 4 threads P-core (2 físicos × 1,3 HT) = 2,6 unidades P-core + 8 threads E-core × (3,3/4,4) = 6,0 unidades equivalentes = 8,6 unidades totais. Speedup esperado ≈ 8,6× vs ideal 12× → eficiência esperada ≈ 72 %. O resultado observado (66 %) sugere contenção de L3 adicional de ~8 %.
+**3. Contenção de cache L3.** Com 6 núcleos físicos e HyperThreading, os 12 threads lógicos compartilham os 12 MiB de cache L3. À medida que mais threads são ativados, a fração do L3 disponível para cada thread diminui, elevando a taxa de cache misses e forçando acessos à memória principal (DDR4-1600). Esse efeito é mais pronunciado em 12 threads do que em 6: a disponibilidade de L3 por thread é reduzida à metade, o que aumenta a pressão sobre o barramento de memória e eleva a latência efetiva das operações de leitura de dados.
 
-**Conclusão para H0/H1 (CPU):** H0 não é rejeitada para o overhead de virtualização propriamente dito — o Hyper-V não degrada significativamente o desempenho de CPU em cargas CPU-bound. A eficiência de 66 % em 12 threads é uma característica da arquitetura heterogênea do i5-1235U, presente também em Linux bare-metal.
+A combinação dos três fatores — fração serial (Amdahl), overhead de sincronização e contenção de L3 — explica coerentemente a curva de eficiência observada: aproximadamente constante entre 1 e 6 threads (100 % → 85 %), com queda abrupta ao dobrar para 12 threads (66 %).
+
+**Conclusão para H0/H1 (CPU):** H0 não é rejeitada para o overhead de virtualização propriamente dito — o Hyper-V não degrada significativamente o desempenho de CPU em cargas CPU-bound. A eficiência de 66 % em 12 threads é explicada pelos limites intrínsecos do paralelismo (Lei de Amdahl, sincronização e cache L3), não pela virtualização em si.
 
 ### 5.4 Implicações Práticas para Uso Acadêmico do WSL2
 
@@ -308,13 +308,13 @@ Os resultados têm implicações diretas para o uso do WSL2 como plataforma de b
 
 **Para benchmarks de memória:** O WSL2 não é adequado para medir largura de banda DRAM com mbw. Os valores são anomalamente baixos e o comportamento é não-intuitivo. O uso de ferramentas como STREAM em Linux nativo é recomendado para caracterização precisa.
 
-**Para benchmarks de CPU:** O WSL2 é adequado para cargas CPU-bound, desde que se compreenda que a arquitetura heterogênea do processador (se presente) causará sub-linearidade no escalonamento que não é artefato da virtualização.
+**Para benchmarks de CPU:** O WSL2 é adequado para cargas CPU-bound, desde que se compreenda que a sub-linearidade no escalonamento — prevista pela Lei de Amdahl e agravada por sincronização e contenção de cache L3 — não é artefato da virtualização, mas um comportamento esperado do hardware paralelo.
 
 ### 5.5 Limitações do Estudo
 
 **Ausência de grupo de controle bare-metal.** O principal limitador deste estudo é a ausência de medições em Linux nativo no mesmo hardware para comparação direta. As estimativas de overhead baseiam-se em valores de referência da literatura e especificações de fabricante.
 
-**Hardware único.** Os experimentos foram conduzidos em um único sistema físico. Processadores com arquitetura diferente (ex.: AMD Ryzen, Intel sem E-cores) ou SSDs de outras interfaces (SATA) podem apresentar comportamentos distintos.
+**Hardware único.** Os experimentos foram conduzidos em um único sistema físico. Processadores com diferentes contagens de núcleos, frequências turbo ou hierarquias de cache, bem como SSDs de outras interfaces (SATA, PCIe 3.0), podem apresentar comportamentos distintos.
 
 **Versão do kernel WSL2.** A versão utilizada (5.15.x) é relativamente conservadora; versões mais recentes (6.x, disponíveis no WSL2 a partir de 2024) podem ter otimizações de VirtIO-blk que reduzem o overhead.
 
@@ -326,15 +326,15 @@ Os resultados têm implicações diretas para o uso do WSL2 como plataforma de b
 
 Este trabalho investigou empiricamente o impacto do WSL2 (via hipervisor Hyper-V) no desempenho de três subsistemas de hardware: armazenamento NVMe, largura de banda de memória e processamento paralelo de CPU. Utilizando 30 repetições por configuração experimental com análise estatística via intervalo de confiança de 95 % (t de Student), os seguintes achados foram estabelecidos:
 
-**Armazenamento NVMe:** O WSL2 entrega 191.733 IOPS (IC 95 %: [181.901; 201.565]) em leitura aleatória 4K, representando aproximadamente 32–48 % do desempenho esperado em Linux nativo para o mesmo hardware. O coeficiente de variação de 13,7 % evidencia instabilidade não-determinística na pilha VirtIO-blk/Hyper-V. A hipótese nula foi rejeitada para este subsistema.
+**Armazenamento NVMe:** O WSL2 atingiu 191.733 IOPS (IC 95 %: [181.901; 201.565]) em leitura aleatória 4K com iodepth=64, com coeficiente de variação de 13,7 % e amplitude de 89 % entre o pior e o melhor caso. Essa instabilidade evidencia overhead não-determinístico na pilha VirtIO-blk/Hyper-V, tornando os resultados inadequados para caracterização do hardware. A hipótese nula foi rejeitada para este subsistema.
 
-**Largura de banda de memória:** Os valores medidos (3.536–4.172 MiB/s) estão cerca de 93–95 % abaixo do limite teórico do LPDDR4x-4266. O padrão anômalo (128 MiB > 16 MiB em throughput) contraria o comportamento esperado em hardware nativo e aponta para interferência do gerenciamento dinâmico de memória do Hyper-V. A hipótese nula foi rejeitada para este subsistema.
+**Largura de banda de memória:** Os valores medidos (3.536–4.172 MiB/s) representam apenas 14–17 % do limite teórico do DDR4-1600 dual-channel (≈ 25,6 GB/s). A restrição de 3,7 GiB de RAM visíveis no WSL2 e o gerenciamento dinâmico de memória do Hyper-V (Dynamic Memory) são os principais fatores explicativos. O padrão anômalo (128 MiB > 16 MiB em throughput) contraria o comportamento esperado em hardware nativo. A hipótese nula foi rejeitada para este subsistema.
 
-**Paralelismo de CPU:** O WSL2 não impõe overhead significativo em cargas CPU-bound. O escalonamento até 6 threads mantém eficiência acima de 85 %, e a queda para 66 % em 12 threads é explicada pela arquitetura heterogênea P-cores + E-cores do i5-1235U. A hipótese nula não foi rejeitada para o overhead de virtualização de CPU.
+**Paralelismo de CPU:** O WSL2 não impõe overhead significativo em cargas CPU-bound. O escalonamento até 6 threads mantém eficiência acima de 85 %, e a queda para 66 % em 12 threads é coerentemente explicada pela Lei de Amdahl (fração serial ≈ 5 %, speedup previsto ≈ 7,74×), overhead de sincronização entre threads e contenção crescente no cache L3 compartilhado de 12 MiB. A hipótese nula não foi rejeitada para o overhead de virtualização de CPU.
 
-**Recomendação principal:** O WSL2 é inadequado como plataforma de benchmarking de hardware para os subsistemas de armazenamento e memória. Pesquisadores e estudantes que precisam caracterizar o desempenho real do hardware devem utilizar Linux nativo. Para cargas puramente computacionais, o WSL2 é uma alternativa viável desde que a heterogeneidade de núcleos do processador seja considerada na análise.
+**Recomendação principal:** O WSL2 é inadequado como plataforma de benchmarking de hardware para os subsistemas de armazenamento e memória. Pesquisadores e estudantes que precisam caracterizar o desempenho real do hardware devem utilizar Linux nativo. Para cargas puramente computacionais, o WSL2 é uma alternativa viável, desde que os limites naturais do paralelismo sejam considerados na análise.
 
-**Trabalhos futuros** incluem: (a) comparação direta entre WSL2 e Linux nativo (dual-boot) no mesmo hardware para quantificação precisa do overhead; (b) investigação do impacto de configurações do `.wslconfig` (especialmente `memory` e `kernelCommandLine`) no throughput de memória; (c) avaliação com kernel WSL2 6.x e io_uring como engine de I/O; (d) experimentos com passthrough de dispositivos NVMe para comparação entre VirtIO-blk e acesso direto; (e) replicação do estudo em processadores com arquitetura homogênea (ex.: AMD Ryzen 5000 série com núcleos Zen 3 uniformes) para isolar o efeito da heterogeneidade de núcleos.
+**Trabalhos futuros** incluem: (a) comparação direta entre WSL2 e Linux nativo (dual-boot) no mesmo hardware para quantificação precisa do overhead de I/O; (b) investigação do impacto de configurações do `.wslconfig` (parâmetros `memory` e `processors`) no throughput de memória e no limite visível de RAM; (c) avaliação com kernel WSL2 6.x e io_uring como engine de I/O no fio; (d) experimentos com passthrough de dispositivos NVMe para comparação entre VirtIO-blk e acesso direto ao hardware; (e) replicação do estudo em sistemas com maior quantidade de RAM para avaliar o efeito da restrição de memória visível no WSL2.
 
 Todos os dados brutos, scripts e figuras deste trabalho estão disponíveis publicamente em <https://github.com/rodrigopaiva06/artido_infra_hw> para reprodução e extensão por pesquisadores interessados.
 
@@ -354,6 +354,6 @@ MICROSOFT. **Announcing WSL 2**. Windows Command Line Blog, maio 2019. Disponív
 
 RUSSELL, R. virtio: towards a de-facto standard for virtual I/O devices. **ACM SIGOPS Operating Systems Review**, New York, v. 42, n. 5, p. 95–103, jul. 2008. DOI: 10.1145/1400097.1400108.
 
-SK HYNIX. **PC801 NVMe SSD — Product Brief**. SK Hynix Inc., 2022. Disponível em: <https://product.skhynix.com/storage/ssd/pc801.go>. Acesso em: jun. 2025.
+SK HYNIX. **HFS512GEJ4K112N NVMe SSD — Product Information**. SK Hynix Inc., 2022. Disponível em: <https://www.skhynix.com/products/SSD/PCIe/>. Acesso em: jun. 2025.
 
 TRAEGER, A. et al. A nine year study of file system and storage benchmarking. **ACM Transactions on Storage**, New York, v. 4, n. 2, art. 5, p. 1–56, maio 2008. DOI: 10.1145/1367829.1367831.
